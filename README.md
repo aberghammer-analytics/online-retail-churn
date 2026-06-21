@@ -11,11 +11,24 @@ interactive HTML report.
 
 ## What "churn" means here
 
-A customer **churns** if they made no product purchase in the final
-**90 days** of the data. Every predictive feature is measured *up to that
-cutoff* — never to the end of the data — so the label's time window can't leak
-into the features. Only customers with at least **2 purchases** are scored (a
-purchase cadence needs at least two purchases to exist).
+Churn is defined relative to a **reference cutoff date** 90 days before the end
+of the data: a customer **churns** if they make no purchase in the 90 days
+*following* that cutoff. A customer who does purchase after the cutoff counts as
+non-churn — *unless* that was their first purchase.
+
+The 90-day window is a deliberately **adjustable parameter**, used here as a
+starting point. It was checked against the median inter-purchase gap (~56 days
+for repeat customers, with a large ~84-day standard deviation): no cutoff
+cleanly separates lapsed customers, but 90 days sits past the typical reorder
+cycle, and the parameter can be re-tuned and re-evaluated.
+
+Two filters shape who is eligible to be scored:
+
+- **Returns and non-standard transactions are removed** — they don't represent typical customer interactions.
+- **Customers who only purchased once before the cutoff are removed** — they lack enough purchase history to be judged churned. This also drops anyone whose first purchase fell after the 90-day cutoff.
+
+Every predictive feature is measured *up to the cutoff* — never to the end of
+the data — so the churn label's time window can't leak into the features.
 
 ## Architecture
 
@@ -108,7 +121,7 @@ JSON blob and renders an interactive walkthrough of the project:
 │   ├── build_report.py             # stage 3: model + render the HTML report
 │   └── report_template.html        # HTML/JS shell with a __REPORT_DATA__ placeholder
 ├── report.html                     # generated, self-contained report (the deliverable)
-├── modeling.ipynb                  # exploratory notebook the report script mirrors
+├── modeling.ipynb                  # exploratory modelling notebook
 ├── Subsalt Takehome Assignment.pdf # the assignment write-up
 ├── pyproject.toml                  # dependencies (managed by uv)
 ├── uv.lock                         # pinned, reproducible dependency versions
@@ -119,8 +132,8 @@ The **`Subsalt Takehome Assignment.pdf`** at the repo root is the write-up of
 the assignment this project responds to.
 
 > **Note:** `modeling.ipynb` is the exploratory scratchpad where the modelling
-> was worked out; `build_report.py` is the cleaned-up, reproducible version of
-> that same logic. The two are kept in sync.
+> was worked out; `report/build_report.py` is the cleaned-up, reproducible
+> script that produces the final report.
 
 ## Modelling notes
 
