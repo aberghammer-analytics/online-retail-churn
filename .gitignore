@@ -1,5 +1,4 @@
 # Data & documentation (kept out of version control)
-data/
 documentation/
 
 # Byte-compiled / optimized / cache
@@ -39,7 +38,11 @@ dist/
 .DS_Store
 
 # Common data/output artifacts
-*.xlsx
+
 *.csv
 *.parquet
 *.pkl
+
+# User
+.scratch/
+.claude/
