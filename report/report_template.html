@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Churn Dossier — Online Retail II</title>
+<style>
+  /* ============================ Design tokens ============================ */
+  :root {
+    --paper:      #f4f1ea;
+    --paper-2:    #ece7da;
+    --card:       #fbfaf5;
+    --ink:        #1c1814;
+    --ink-soft:   #4a4338;
+    --muted:      #7c7264;
+    --rule:       #d9d0bf;
+    --rule-soft:  #e7e0d2;
+    --churn:      #b23a1e;   /* oxblood / vermilion — at-risk */
+    --churn-2:    #d9633f;
+    --retain:     #1f6b5c;   /* deep teal-green — retained   */
+    --retain-2:   #3d9182;
+    --gold:       #b08524;
+    --ink-on:     #f4f1ea;
+    --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Hoefler Text', Georgia, 'Times New Roman', serif;
+    --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+    --shadow: 0 1px 0 rgba(28,24,20,.04), 0 18px 40px -28px rgba(28,24,20,.45);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* paper grain overlay */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    opacity: .035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .mono { font-family: var(--mono); }
+  .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  a { color: var(--churn); }
+
+  /* ============================ Top nav ============================ */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 4px;
+    padding: 10px 28px;
+    background: rgba(244,241,234,.86);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--rule);
+    overflow-x: auto;
+  }
+  nav .brand {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink);
+    margin-right: auto; white-space: nowrap; font-weight: 600;
+  }
+  nav .brand b { color: var(--churn); }
+  nav a {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+    color: var(--ink-soft); text-decoration: none;
+    padding: 6px 10px; border-radius: 4px; white-space: nowrap;
+  }
+  nav a:hover { background: var(--paper-2); color: var(--ink); }
+
+  /* ============================ Layout ============================ */
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+  section { padding: 76px 0 28px; border-top: 1px solid var(--rule-soft); }
+  section:first-of-type { border-top: none; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 26px; }
+  .sec-num {
+    font-family: var(--mono); font-size: 13px; color: var(--churn);
+    border: 1px solid var(--churn); border-radius: 50%;
+    width: 30px; height: 30px; display: grid; place-items: center; flex: none;
+  }
+  h1, h2, h3 { font-weight: 600; line-height: 1.12; letter-spacing: -.01em; }
+  h2 { font-size: clamp(26px, 4vw, 38px); margin: 0; }
+  h3 { font-size: 21px; margin: 28px 0 10px; }
+  p { max-width: 68ch; }
+  .lede { font-size: 21px; color: var(--ink-soft); }
+  .small { font-size: 15px; color: var(--muted); }
+
+  /* ============================ Hero ============================ */
+  header.hero { padding: 64px 0 30px; }
+  .kicker { display:flex; gap:14px; align-items:center; margin-bottom: 22px; }
+  .kicker .dot { width:9px;height:9px;border-radius:50%;background:var(--churn); box-shadow:0 0 0 4px rgba(178,58,30,.16); }
+  header.hero h1 { font-size: clamp(40px, 7vw, 76px); margin: 0 0 18px; max-width: 16ch; }
+  header.hero h1 em { font-style: italic; color: var(--churn); }
+  .hero-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 40px; align-items: end; margin-top: 30px; }
+  @media (max-width: 760px){ .hero-grid { grid-template-columns: 1fr; } }
+  .stat-stack { display: grid; gap: 14px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--rule);
+    border-left: 3px solid var(--churn); border-radius: 8px;
+    padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .stat .v { font-family: var(--mono); font-size: 30px; color: var(--ink); line-height: 1; }
+  .stat .v small { font-size: 15px; color: var(--muted); }
+  .stat .k { margin-top: 6px; }
+
+  /* ============================ Cards / grids ============================ */
+  .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 22px; box-shadow: var(--shadow);
+  }
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 760px){ .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ============================ Tables ============================ */
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule-soft); }
+  th { color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 11px; cursor: default; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--ink); }
+  th.sortable.active { color: var(--churn); }
+  tbody tr:hover { background: var(--paper-2); }
+  td.num { text-align: right; }
+  .doc-cell { font-family: var(--serif); font-size: 14px; color: var(--ink-soft); white-space: normal; }
+
+  /* ============================ Pipeline ============================ */
+  .stage-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+  .stage-tab {
+    font-family: var(--mono); font-size: 13px; letter-spacing: .04em;
+    padding: 9px 16px; border: 1px solid var(--rule); border-radius: 999px;
+    background: var(--card); color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .stage-tab .tag { font-size: 10px; padding: 1px 7px; border-radius: 999px; background: var(--paper-2); color: var(--muted); }
+  .stage-tab.active { background: var(--ink); color: var(--ink-on); border-color: var(--ink); }
+  .stage-tab.active .tag { background: var(--churn); color: #fff; }
+  .arrow { align-self: center; color: var(--muted); font-family: var(--mono); }
+
+  .funnel { display: grid; gap: 8px; margin: 8px 0 6px; }
+  .funnel-row { display: grid; grid-template-columns: 230px 1fr auto; align-items: center; gap: 12px; }
+  .funnel-row .fl { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+  .funnel-bar { height: 22px; background: linear-gradient(90deg, var(--churn), var(--churn-2)); border-radius: 4px; }
+  .funnel-row .fv { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  @media (max-width:600px){ .funnel-row{ grid-template-columns: 1fr; } .funnel-row .fv{ justify-self:start; } }
+
+  details { border: 1px solid var(--rule); border-radius: 8px; margin-top: 14px; background: var(--card); }
+  details summary {
+    cursor: pointer; padding: 12px 16px; font-family: var(--mono);
+    font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft);
+    list-style: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "▸ "; color: var(--churn); }
+  details[open] summary::before { content: "▾ "; }
+  pre {
+    margin: 0; padding: 16px 18px; overflow-x: auto;
+    background: #211c17; color: #e9e2d2; border-radius: 0 0 8px 8px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+  }
+  .chip {
+    display:inline-block; font-family:var(--mono); font-size:11px; color:var(--ink-soft);
+    background:var(--paper-2); border:1px solid var(--rule); border-radius:6px;
+    padding:3px 8px; margin:3px 4px 0 0;
+  }
+
+  /* ============================ Controls ============================ */
+  select, input[type="text"] {
+    font-family: var(--mono); font-size: 14px; color: var(--ink);
+    background: var(--card); border: 1px solid var(--rule); border-radius: 7px;
+    padding: 9px 12px;
+  }
+  input[type="range"] { -webkit-appearance:none; appearance:none; height: 4px; background: var(--rule); border-radius: 4px; outline: none; }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--churn); border: 3px solid var(--card); box-shadow: 0 1px 4px rgba(0,0,0,.3); cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius:50%; background: var(--churn); border: 3px solid var(--card); cursor:pointer; }
+
+  .legend { display:flex; gap:18px; align-items:center; margin: 6px 0 14px; }
+  .legend span { display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:12px; color:var(--ink-soft); }
+  .legend i { width:13px; height:13px; border-radius:3px; display:inline-block; }
+  .sw-churn { background: var(--churn); }
+  .sw-retain { background: var(--retain); }
+
+  /* confusion matrix */
+  .cm { display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-width: 360px; }
+  .cm .cell { border-radius: 8px; padding: 14px; text-align:center; border:1px solid var(--rule); }
+  .cm .cell .n { font-family:var(--mono); font-size: 26px; }
+  .cm .cell .t { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .cm .tp { background: rgba(31,107,92,.14); border-color: var(--retain-2); }
+  .cm .tn { background: rgba(31,107,92,.07); }
+  .cm .fp { background: rgba(178,58,30,.10); }
+  .cm .fn { background: rgba(178,58,30,.16); border-color: var(--churn-2); }
+
+  .metric-row { display:flex; flex-wrap:wrap; gap: 10px; margin: 14px 0; }
+  .metric {
+    background: var(--paper-2); border:1px solid var(--rule); border-radius: 8px;
+    padding: 10px 14px; min-width: 96px;
+  }
+  .metric .v { font-family:var(--mono); font-size: 22px; }
+  .metric .k { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color: var(--muted); }
+
+  /* gauge */
+  .gauge-num { font-family: var(--mono); font-size: 56px; line-height: 1; }
+
+  .note { font-size: 14px; color: var(--muted); border-left: 2px solid var(--gold); padding-left: 12px; }
+  svg text { font-family: var(--mono); }
+  footer { padding: 50px 0 80px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .risk-track { background: var(--rule-soft); border-radius: 4px; height: 9px; width: 90px; display:inline-block; vertical-align: middle; overflow:hidden; }
+  .risk-fill { height: 100%; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">CHURN<b>·</b>DOSSIER</span>
+  <a href="#overview">00 Overview</a>
+  <a href="#pipeline">01 Pipeline</a>
+  <a href="#features">02 Features</a>
+  <a href="#models">03 Models</a>
+  <a href="#threshold">04 Threshold</a>
+  <a href="#whatif">05 What-if</a>
+  <a href="#customers">06 Customers</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- ============================ HERO ============================ -->
+  <header class="hero" id="overview">
+    <div class="kicker">
+      <span class="dot"></span>
+      <span class="label">Online Retail II · Customer Churn · Take-home dossier</span>
+    </div>
+    <h1>Who's about to <em>stop buying</em>, and how do we know?</h1>
+    <p class="lede" id="hero-lede"></p>
+    <div class="hero-grid">
+      <div>
+        <p>This report walks through the full pipeline — from <b>824k raw transaction
+        line items</b> down to a per-customer model that ranks who is most likely to
+        churn. It is built for two readers at once: the business story sits up top, and
+        every technical detail lives one click away inside the <span class="mono">▸ technical</span>
+        panels. Everything below is <b>live</b> — drag the sliders, sort the tables,
+        explore the data.</p>
+        <p class="small">Churn is defined as <b>no product purchase in the final
+        90&nbsp;days</b> of the data. All features are measured strictly before that
+        cutoff so the label can never leak into the inputs.</p>
+      </div>
+      <div class="stat-stack" id="hero-stats"></div>
+    </div>
+  </header>
+
+  <!-- ============================ 01 PIPELINE ============================ -->
+  <section id="pipeline">
+    <div class="sec-head"><div class="sec-num">01</div><h2>The pipeline, stage by stage</h2></div>
+    <p>The project follows a <b>medallion architecture</b>: raw data is refined in layers.
+    <span class="mono">Bronze</span> is lightly-cleaned transactions; <span class="mono">Silver</span>
+    is one feature-rich row per customer; the <span class="mono">model</span> is the gold output.
+    Click a stage to inspect it.</p>
+
+    <div class="stage-tabs" id="stage-tabs"></div>
+    <div id="stage-body"></div>
+
+    <h3>From line items to customers</h3>
+    <p class="small">Each refining step shrinks the data toward the modelling unit — one row per customer.</p>
+    <div class="funnel" id="funnel"></div>
+  </section>
+
+  <!-- ============================ 02 FEATURES ============================ -->
+  <section id="features">
+    <div class="sec-head"><div class="sec-num">02</div><h2>Feature explorer</h2></div>
+    <p>Eleven behavioural features describe each customer. Pick one to see how it is
+    distributed, and — crucially — how churn rate shifts across its range. Distributions
+    are split by outcome: <b style="color:var(--retain)">retained</b> vs
+    <b style="color:var(--churn)">churned</b>.</p>
+
+    <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin: 6px 0 18px;">
+      <span class="label">Feature</span>
+      <select id="feat-select"></select>
+      <span class="small mono" id="feat-doc"></span>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="label">Distribution by outcome</div>
+        <div class="legend">
+          <span><i class="sw-retain"></i> Retained</span>
+          <span><i class="sw-churn"></i> Churned</span>
+        </div>
+        <div id="feat-hist"></div>
+      </div>
+      <div class="card">
+        <div class="label">Churn rate across the feature range</div>
+        <p class="small" style="margin:6px 0 0">Dashed line = overall base churn rate. Bars above it mark higher-risk regions.</p>
+        <div id="feat-rate"></div>
+      </div>
+    </div>
+    <div class="metric-row" id="feat-stats"></div>
+  </section>
+
+  <!-- ============================ 03 MODELS ============================ -->
+  <section id="models">
+    <div class="sec-head"><div class="sec-num">03</div><h2>Two models, compared</h2></div>
+    <p>A <b>logistic regression</b> baseline (interpretable, linear) and a tuned
+    <b>random forest</b> (non-linear, the final model). Both are scored on the same
+    held-out 20% test set. The forest wins on ranking quality — exactly what a retention
+    team needs when it can only call the top slice of at-risk customers.</p>
+    <div class="grid-2" id="model-cards"></div>
+
+    <h3>What drives the prediction?</h3>
+    <div class="grid-2">
+      <div class="card">
+        <div class="label">Logistic coefficients (scaled)</div>
+        <p class="small" style="margin:6px 0 0">Positive → pushes toward churn. Negative → toward retention.</p>
+        <div id="coef-chart"></div>
+      </div>
+      <div class="card">
+        <div class="label">Random forest importances</div>
+        <p class="small" style="margin:6px 0 0">How much each feature reduces impurity across the trees.</p>
+        <div id="imp-chart"></div>
+      </div>
+    </div>
+
+    <details>
+      <summary>Technical detail — preprocessing &amp; validation</summary>
+      <div style="padding:16px 18px; font-family:var(--serif); font-size:15px; color:var(--ink-soft)">
+        <p style="margin-top:0">Right-skewed spend/cadence features
+        (<span class="mono" id="logcols-inline"></span>) get a <span class="mono">log1p</span>
+        transform before standard scaling, so the linear model isn't dominated by a few
+        whales. Tree models are scale-invariant, so the forest just median-imputes.
+        Validation is <span class="mono">5-fold StratifiedKFold</span> on the training split;
+        the forest is tuned with <span class="mono">RandomizedSearchCV</span> (10 draws).
+        The test set is touched exactly once, at the end.</p>
+        <p style="margin-bottom:0"><b>Leakage guard:</b> the train/test split is stratified
+        on the label, and every feature is computed strictly before the 90-day cutoff —
+        the same cutoff that defines churn — so future information never enters the inputs.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================ 04 THRESHOLD ============================ -->
+  <section id="threshold">
+    <div class="sec-head"><div class="sec-num">04</div><h2>Pick a threshold</h2></div>
+    <p>The model outputs a <b>probability</b>, not a yes/no. Choosing the cut-off is a
+    business call: a low threshold catches more churners (high recall) but wastes outreach
+    on the loyal; a high threshold is precise but misses people. Drag to feel the trade-off
+    on the random forest's test-set predictions.</p>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <span class="label">Decision threshold</span>
+        <input type="range" id="thr" min="0.05" max="0.95" step="0.01" value="0.5" style="flex:1; min-width:220px;">
+        <span class="mono" id="thr-val" style="font-size:22px; color:var(--churn); min-width:60px;">0.50</span>
+      </div>
+      <div class="grid-2" style="margin-top:20px; align-items:start;">
+        <div class="cm" id="thr-cm"></div>
+        <div class="metric-row" id="thr-metrics" style="margin:0"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 05 WHAT-IF ============================ -->
+  <section id="whatif">
+    <div class="sec-head"><div class="sec-num">05</div><h2>What-if calculator</h2></div>
+    <p>Build a hypothetical customer and watch their churn probability move. This runs the
+    <b>logistic regression</b> live in your browser — the exact same coefficients, scaling,
+    and <span class="mono">log1p</span> steps the model learned — so you can read off how
+    each behaviour shifts the odds.</p>
+    <p class="note">This is the interpretable logistic model, not the random forest. Use it
+    to build intuition about direction and magnitude, not for exact RF scores.</p>
+
+    <div class="grid-2" style="align-items:start;">
+      <div class="card" id="whatif-controls"></div>
+      <div class="card" style="position:sticky; top:84px; text-align:center;">
+        <div class="label">Predicted churn probability</div>
+        <div class="gauge-num" id="wi-prob" style="margin:14px 0 4px;">—</div>
+        <div id="wi-bar" class="risk-track" style="width:100%; height:14px; margin: 8px 0 16px;">
+          <div class="risk-fill" id="wi-fill" style="width:0%"></div>
+        </div>
+        <div class="mono small" id="wi-verdict"></div>
+        <div style="margin-top:18px; text-align:left;">
+          <div class="label" style="margin-bottom:8px">Contribution to log-odds</div>
+          <div id="wi-contrib"></div>
+        </div>
+        <button id="wi-reset" class="chip" style="cursor:pointer; margin-top:14px;">↺ reset to typical customer</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 06 CUSTOMERS ============================ -->
+  <section id="customers">
+    <div class="sec-head"><div class="sec-num">06</div><h2>Customer explorer</h2></div>
+    <p>Every customer, scored. To keep it honest, risk here is an <b>out-of-fold</b>
+    estimate — each customer is scored by a forest that never saw them in training. Sort,
+    search, and filter to find who a retention team should call first.</p>
+
+    <details id="cust-details">
+      <summary style="font-size:14px; padding:16px 18px;"><span id="cust-summary">Open the explorer</span></summary>
+      <div style="padding: 16px 18px 18px;">
+        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin: 2px 0 16px;">
+          <input type="text" id="cust-search" placeholder="search customer id…" style="min-width:220px">
+          <span class="label">Show</span>
+          <select id="cust-filter">
+            <option value="all">all customers</option>
+            <option value="churn1">actually churned</option>
+            <option value="churn0">retained</option>
+            <option value="high">risk ≥ 0.50</option>
+          </select>
+          <span class="small mono" id="cust-count"></span>
+        </div>
+        <div class="card" style="padding:6px 6px 10px; overflow-x:auto;">
+          <table id="cust-table">
+            <thead><tr id="cust-head"></tr></thead>
+            <tbody id="cust-body"></tbody>
+          </table>
+          <div class="small mono" id="cust-more" style="padding:10px 12px 2px"></div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    Generated from <span style="color:var(--ink-soft)">build_bronze.py · build_silver.py · modeling.ipynb</span>.
+    Self-contained, offline, single file. Online Retail II dataset.
+  </footer>
+</div>
+
+<script>
+const DATA = __REPORT_DATA__;
+
+/* ============================ Helpers ============================ */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+function el(tag, attrs={}, ...kids){
+  const n = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)){
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v);
+  }
+  for (const kid of kids){ if (kid==null) continue; n.append(kid.nodeType ? kid : document.createTextNode(kid)); }
+  return n;
+}
+const fmtInt = n => n==null ? "—" : Math.round(n).toLocaleString("en-US");
+const fmtPct = (n,d=1) => (100*n).toFixed(d) + "%";
+const fmt = (n,d=2) => Number(n).toLocaleString("en-US",{maximumFractionDigits:d, minimumFractionDigits:d});
+const sigmoid = z => 1/(1+Math.exp(-z));
+const SVGNS = "http://www.w3.org/2000/svg";
+function svg(w,h){ const s=document.createElementNS(SVGNS,"svg"); s.setAttribute("viewBox",`0 0 ${w} ${h}`); s.setAttribute("width","100%"); s.style.display="block"; return s; }
+function svgEl(tag, attrs, text){ const n=document.createElementNS(SVGNS,tag); for(const[k,v]of Object.entries(attrs)) n.setAttribute(k,v); if(text!=null) n.textContent=String(text); return n; }
+const C = { churn:"#b23a1e", retain:"#1f6b5c", muted:"#7c7264", rule:"#d9d0bf", ink:"#1c1814", gold:"#b08524" };
+function riskColor(p){ // teal -> gold -> oxblood
+  const a=[31,107,92], b=[176,133,36], c=[178,58,30];
+  const mix=(x,y,t)=>Math.round(x+(y-x)*t);
+  let r,g,bl;
+  if(p<0.5){const t=p/0.5; r=mix(a[0],b[0],t);g=mix(a[1],b[1],t);bl=mix(a[2],b[2],t);}
+  else {const t=(p-0.5)/0.5; r=mix(b[0],c[0],t);g=mix(b[1],c[1],t);bl=mix(b[2],c[2],t);}
+  return `rgb(${r},${g},${bl})`;
+}
+
+/* ============================ Hero ============================ */
+(function hero(){
+  const rf = DATA.models.rf, lg = DATA.models.logit;
+  const p10 = rf.precision_at_k[0];
+  $("#hero-lede").textContent =
+    `A tuned random forest reaches AUC ${fmt(rf.test_auc,3)} on held-out customers — and of the ` +
+    `riskiest 10% it flags, ${fmtPct(p10.precision,0)} truly churn (${fmt(p10.lift,2)}× better than chance).`;
+  const stats = [
+    {v: fmtInt(DATA.n_customers), k:"customers modelled"},
+    {v: fmt(rf.test_auc,3), k:"random forest test AUC"},
+    {v: fmtPct(p10.precision,0), sub:` · ${fmt(p10.lift,2)}× lift`, k:"precision @ top-10% risk"},
+    {v: fmtPct(rf.base_rate,1), k:"base churn rate"},
+  ];
+  const wrap = $("#hero-stats");
+  stats.forEach(s=>{
+    wrap.append(el("div",{class:"stat"},
+      el("div",{class:"v"}, s.v, s.sub? el("small",{},s.sub):null),
+      el("div",{class:"k label"}, s.k)
+    ));
+  });
+})();
+
+/* ============================ 01 Pipeline ============================ */
+(function pipeline(){
+  const P = DATA.pipeline;
+  const stages = [
+    { id:"bronze", name:"Bronze", tag:"raw", build: bronzeBody },
+    { id:"silver", name:"Silver", tag:"features", build: silverBody },
+    { id:"model",  name:"Model",  tag:"gold", build: modelBody },
+  ];
+  const tabs = $("#stage-tabs"), body = $("#stage-body");
+  stages.forEach((s,i)=>{
+    if(i) tabs.append(el("span",{class:"arrow"},"→"));
+    const t = el("div",{class:"stage-tab"+(i===0?" active":""), onclick:()=>select(i)},
+      s.name, el("span",{class:"tag"}, s.tag));
+    s.tab = t; tabs.append(t);
+  });
+  function select(i){ stages.forEach((s,j)=>s.tab.classList.toggle("active", i===j)); body.replaceChildren(stages[i].build()); }
+
+  function schemaTable(rows){
+    const t = el("table",{},
+      el("thead",{}, el("tr",{}, el("th",{},"column"), el("th",{},"dtype"), el("th",{class:"doc-cell"},"meaning"))));
+    const tb = el("tbody",{});
+    rows.forEach(r=> tb.append(el("tr",{},
+      el("td",{}, r.name), el("td",{style:"color:var(--muted)"}, r.dtype), el("td",{class:"doc-cell"}, r.doc||"—"))));
+    t.append(tb); return t;
+  }
+  function codeBlock(title, code){
+    return el("details",{}, el("summary",{},title), el("pre",{}, code));
+  }
+  function bronzeBody(){
+    return el("div",{},
+      el("p",{}, "Two yearly Excel sheets are concatenated, columns renamed to snake_case, and rows missing an invoice or customer id are dropped. Three convenience columns are derived: ",
+        el("span",{class:"mono"},"invoice_date"), ", ", el("span",{class:"mono"},"invoice_month_year"), ", ", el("span",{class:"mono"},"line_item_total"), "."),
+      el("div",{class:"label",style:"margin:14px 0 8px"}, fmtInt(P.funnel.stages[0].value) + " line items · 11 columns"),
+      schemaTable(P.bronze_schema),
+      codeBlock("source — build_bronze.py", P.code.bronze)
+    );
+  }
+  function silverBody(){
+    const cd = P.churn_distribution, tot = cd.retained + cd.churned;
+    const chips = P.constants.non_product.map(c=>el("span",{class:"chip"},c));
+    return el("div",{},
+      el("p",{}, "Returns and non-product codes (postage, fees, adjustments) are stripped, line items roll up to invoices to measure ",
+        el("b",{},"gaps between purchases"), ", then everything aggregates to one row per customer. Customers need ",
+        el("b",{}, "≥ " + P.constants.min_purchases + " purchases"), " to have a cadence."),
+      el("div",{style:"display:flex; gap:24px; flex-wrap:wrap; margin:12px 0;"},
+        el("div",{}, el("div",{class:"label"},"churn cutoff"), el("div",{class:"mono",style:"font-size:18px"}, P.constants.cutoff_date + " · last " + P.constants.cutoff_n_days + "d")),
+        el("div",{}, el("div",{class:"label"},"churned"), el("div",{class:"mono",style:"font-size:18px;color:var(--churn)"}, fmtInt(cd.churned)+" ("+fmtPct(cd.churned/tot,1)+")")),
+        el("div",{}, el("div",{class:"label"},"retained"), el("div",{class:"mono",style:"font-size:18px;color:var(--retain)"}, fmtInt(cd.retained)+" ("+fmtPct(cd.retained/tot,1)+")")),
+      ),
+      el("div",{class:"label",style:"margin:6px 0 6px"},"dropped non-product stock codes"),
+      el("div",{}, ...chips),
+      el("div",{style:"margin-top:16px"}, schemaTable(P.silver_schema)),
+      codeBlock("source — build_silver.py", P.code.silver)
+    );
+  }
+  function modelBody(){
+    const rf = DATA.models.rf;
+    return el("div",{},
+      el("p",{}, "The silver table is split 80/20 (stratified). Date columns and ",
+        el("span",{class:"mono"},"total_units"), " are dropped, leaving ",
+        el("b",{}, DATA.feature_names.length + " features"), ". A logistic baseline and a tuned random forest are trained; the forest is the final model."),
+      el("div",{style:"display:flex; gap:24px; flex-wrap:wrap; margin-top:8px"},
+        el("div",{}, el("div",{class:"label"},"best RF params"),
+          el("div",{class:"mono",style:"font-size:14px"}, Object.entries(rf.best_params).map(([k,v])=>k.replace("clf__","")+"="+v).join("  ·  "))),
+        el("div",{}, el("div",{class:"label"},"tuned CV AUC"), el("div",{class:"mono",style:"font-size:18px"}, fmt(rf.tuned_cv_auc,3))),
+      ),
+      el("p",{class:"small",style:"margin-top:14px"}, "Jump to section 03 for the full comparison, section 05 to explore every scored customer.")
+    );
+  }
+  select(0);
+
+  // funnel
+  const fwrap = $("#funnel");
+  const max = P.funnel.stages[0].value;
+  P.funnel.stages.forEach(s=>{
+    fwrap.append(el("div",{class:"funnel-row"},
+      el("div",{class:"fl"}, s.label),
+      el("div",{}, el("div",{class:"funnel-bar", style:`width:${Math.max(2,100*s.value/max)}%`})),
+      el("div",{class:"fv"}, fmtInt(s.value))
+    ));
+  });
+})();
+
+/* ============================ 02 Feature explorer ============================ */
+(function features(){
+  const sel = $("#feat-select");
+  DATA.feature_names.forEach(f=> sel.append(el("option",{value:f}, f)));
+  sel.addEventListener("change", ()=>render(sel.value));
+  function render(feat){
+    const meta = DATA.eda.features[feat];
+    $("#feat-doc").textContent = meta.doc || "";
+    const vals0=[], vals1=[];
+    DATA.customers.forEach(c=>{ (c.churn? vals1:vals0).push(c[feat]); });
+    drawHist(feat, vals0, vals1, meta);
+    drawRate(feat, meta);
+    drawStats(meta);
+  }
+  function pctile(arr,p){ const a=[...arr].sort((x,y)=>x-y); return a[Math.min(a.length-1, Math.floor(p*a.length))]; }
+  function drawHist(feat, v0, v1, meta){
+    const all=[...v0,...v1];
+    const lo=Math.min(...all), hi=pctile(all,0.99);
+    const span=(hi-lo)||1, nb=24, W=480,H=240, pad={l:38,r:10,t:10,b:34};
+    const bins0=Array(nb).fill(0), bins1=Array(nb).fill(0);
+    const bi=x=>Math.min(nb-1,Math.max(0,Math.floor((x-lo)/span*nb)));
+    v0.forEach(x=>bins0[bi(x)]++); v1.forEach(x=>bins1[bi(x)]++);
+    const ymax=Math.max(...bins0,...bins1,1);
+    const s=svg(W,H);
+    const bw=(W-pad.l-pad.r)/nb;
+    const yof=v=>H-pad.b-(v/ymax)*(H-pad.t-pad.b);
+    // axes
+    s.append(svgEl("line",{x1:pad.l,y1:H-pad.b,x2:W-pad.r,y2:H-pad.b,stroke:C.rule}));
+    for(let g=0; g<=2; g++){ const yy=pad.t+(H-pad.t-pad.b)*g/2; const val=Math.round(ymax*(1-g/2));
+      s.append(svgEl("text",{x:pad.l-6,y:yy+4,"text-anchor":"end","font-size":9,fill:C.muted}, val)); }
+    for(let i=0;i<nb;i++){
+      const x=pad.l+i*bw;
+      s.append(svgEl("rect",{x:x+1,y:yof(bins0[i]),width:bw/2-1,height:(H-pad.b)-yof(bins0[i]),fill:C.retain,opacity:.85}));
+      s.append(svgEl("rect",{x:x+bw/2,y:yof(bins1[i]),width:bw/2-1,height:(H-pad.b)-yof(bins1[i]),fill:C.churn,opacity:.85}));
+    }
+    [0,0.5,1].forEach(t=>{ const x=pad.l+t*(W-pad.l-pad.r); const val=lo+t*span;
+      s.append(svgEl("text",{x, y:H-pad.b+16,"text-anchor":"middle","font-size":9,fill:C.muted}, Math.abs(val)>=1000? fmtInt(val): fmt(val,1))); });
+    if(Math.max(...all)>hi){ s.append(svgEl("text",{x:W-pad.r,y:pad.t+8,"text-anchor":"end","font-size":8,fill:C.muted}, "(99th pctile clip)")); }
+    const box=$("#feat-hist"); box.replaceChildren(s);
+  }
+  function drawRate(feat, meta){
+    const lo=meta.min, hi=meta.max==meta.min? meta.min+1: meta.max;
+    // use p99 clip too for stable buckets
+    const all=DATA.customers.map(c=>c[feat]);
+    const a=[...all].sort((x,y)=>x-y); const hiC=a[Math.floor(0.99*a.length)]||hi;
+    const span=(hiC-lo)||1, nb=10, W=480,H=240, pad={l:38,r:10,t:14,b:34};
+    const tot=Array(nb).fill(0), ch=Array(nb).fill(0);
+    const bi=x=>Math.min(nb-1,Math.max(0,Math.floor((x-lo)/span*nb)));
+    DATA.customers.forEach(c=>{ const b=bi(c[feat]); tot[b]++; if(c.churn)ch[b]++; });
+    const base=DATA.models.rf.base_rate;
+    const s=svg(W,H), bw=(W-pad.l-pad.r)/nb;
+    const yof=v=>H-pad.b-v*(H-pad.t-pad.b);
+    s.append(svgEl("line",{x1:pad.l,y1:H-pad.b,x2:W-pad.r,y2:H-pad.b,stroke:C.rule}));
+    [0,.25,.5,.75,1].forEach(g=>{ const yy=yof(g); s.append(svgEl("text",{x:pad.l-6,y:yy+4,"text-anchor":"end","font-size":9,fill:C.muted}, Math.round(g*100))); });
+    for(let i=0;i<nb;i++){
+      if(!tot[i]) continue;
+      const rate=ch[i]/tot[i], x=pad.l+i*bw;
+      s.append(svgEl("rect",{x:x+2,y:yof(rate),width:bw-4,height:(H-pad.b)-yof(rate),fill:riskColor(rate),rx:2}));
+    }
+    // base line
+    s.append(svgEl("line",{x1:pad.l,y1:yof(base),x2:W-pad.r,y2:yof(base),stroke:C.ink,"stroke-dasharray":"4 4","stroke-width":1}));
+    s.append(svgEl("text",{x:W-pad.r,y:yof(base)-4,"text-anchor":"end","font-size":9,fill:C.ink}, "base "+fmtPct(base,0)));
+    [0,0.5,1].forEach(t=>{ const x=pad.l+t*(W-pad.l-pad.r); const val=lo+t*span;
+      s.append(svgEl("text",{x,y:H-pad.b+16,"text-anchor":"middle","font-size":9,fill:C.muted}, Math.abs(val)>=1000?fmtInt(val):fmt(val,1))); });
+    $("#feat-rate").replaceChildren(s);
+  }
+  function drawStats(meta){
+    const row=$("#feat-stats"); row.replaceChildren();
+    const cells=[
+      {k:"skew", v:fmt(meta.skew,2)},
+      {k:"median", v:Math.abs(meta.median)>=1000?fmtInt(meta.median):fmt(meta.median,2)},
+      {k:"churn ≤ median", v:fmtPct(meta.churn_below_median,0)},
+      {k:"churn > median", v:fmtPct(meta.churn_above_median,0)},
+    ];
+    cells.forEach(c=> row.append(el("div",{class:"metric"}, el("div",{class:"v"},c.v), el("div",{class:"k"},c.k))));
+  }
+  render(DATA.feature_names[0]);
+})();
+
+/* ============================ 03 Models ============================ */
+(function models(){
+  $("#logcols-inline").textContent = DATA.log_cols.join(", ");
+  const cards=$("#model-cards");
+  function pkTable(rows){
+    const t=el("table",{}, el("thead",{}, el("tr",{}, el("th",{},"top-k%"), el("th",{class:"num"},"precision"), el("th",{class:"num"},"lift"))));
+    const tb=el("tbody",{});
+    rows.forEach(r=> tb.append(el("tr",{}, el("td",{},r.k+"%"), el("td",{class:"num"},fmtPct(r.precision,1)), el("td",{class:"num"},fmt(r.lift,2)+"×"))));
+    t.append(tb); return t;
+  }
+  function card(title, m, isFinal){
+    const rep=m.report;
+    return el("div",{class:"card", style: isFinal? "border-left:3px solid var(--churn)":""},
+      el("div",{style:"display:flex; align-items:center; justify-content:space-between"},
+        el("h3",{style:"margin:0"}, title),
+        isFinal? el("span",{class:"chip",style:"background:var(--churn);color:#fff;border-color:var(--churn)"},"final") : el("span",{class:"chip"},"baseline")),
+      el("div",{class:"metric-row"},
+        el("div",{class:"metric"}, el("div",{class:"v"},fmt(m.test_auc,3)), el("div",{class:"k"},"test AUC")),
+        el("div",{class:"metric"}, el("div",{class:"v"},fmt(m.cv_auc_mean,3)), el("div",{class:"k"},"CV AUC")),
+        el("div",{class:"metric"}, el("div",{class:"v"},fmt(rep["1"]["precision"],2)), el("div",{class:"k"},"precision@.5")),
+        el("div",{class:"metric"}, el("div",{class:"v"},fmt(rep["1"]["recall"],2)), el("div",{class:"k"},"recall@.5")),
+      ),
+      el("div",{class:"label",style:"margin:8px 0 4px"},"precision @ top-k risk"),
+      pkTable(m.precision_at_k)
+    );
+  }
+  cards.append(card("Logistic regression", DATA.models.logit, false));
+  cards.append(card("Random forest", DATA.models.rf, true));
+
+  // coefficient & importance charts
+  hbar("#coef-chart", Object.entries(DATA.models.logit.coef).map(([k,v])=>({k,v})), true);
+  hbar("#imp-chart", Object.entries(DATA.models.rf.importances).map(([k,v])=>({k,v})), false);
+
+  function hbar(sel, items, signed){
+    items.sort((a,b)=> signed? Math.abs(b.v)-Math.abs(a.v) : b.v-a.v);
+    const W=480, rowH=26, pad={l:130,r:40,t:6,b:6}, H=pad.t+pad.b+items.length*rowH;
+    const s=svg(W,H);
+    const maxAbs=Math.max(...items.map(d=>Math.abs(d.v)));
+    const x0 = signed? (pad.l+(W-pad.l-pad.r)/2) : pad.l;
+    const fullW = signed? (W-pad.l-pad.r)/2 : (W-pad.l-pad.r);
+    if(signed) s.append(svgEl("line",{x1:x0,y1:pad.t,x2:x0,y2:H-pad.b,stroke:C.rule}));
+    items.forEach((d,i)=>{
+      const y=pad.t+i*rowH;
+      const w=Math.abs(d.v)/maxAbs*fullW;
+      const pos=d.v>=0;
+      const x= signed? (pos? x0 : x0-w) : x0;
+      const col= signed? (pos? C.churn : C.retain) : C.gold;
+      s.append(svgEl("rect",{x, y:y+5, width:Math.max(1,w), height:rowH-12, fill:col, rx:2}));
+      s.append(svgEl("text",{x:pad.l-8, y:y+rowH/2+3, "text-anchor":"end","font-size":11, fill:C.ink}, d.k));
+      const tx = signed? (pos? x+w+4 : x-4) : x+w+5;
+      const ta = signed? (pos? "start":"end") : "start";
+      s.append(svgEl("text",{x:tx, y:y+rowH/2+3, "text-anchor":ta, "font-size":10, fill:C.muted}, signed? d.v.toFixed(2) : d.v.toFixed(3)));
+    });
+    $(sel).replaceChildren(s);
+  }
+})();
+
+/* ============================ 04 Threshold ============================ */
+(function threshold(){
+  const preds = DATA.test_predictions;
+  const slider=$("#thr"), out=$("#thr-val");
+  function render(t){
+    out.textContent=t.toFixed(2);
+    let tp=0,fp=0,tn=0,fn=0;
+    preds.forEach(p=>{ const pred=p.proba>=t?1:0;
+      if(pred&&p.actual)tp++; else if(pred&&!p.actual)fp++; else if(!pred&&p.actual)fn++; else tn++; });
+    const prec=tp/(tp+fp||1), rec=tp/(tp+fn||1), f1=2*prec*rec/((prec+rec)||1), acc=(tp+tn)/preds.length;
+    const cm=$("#thr-cm"); cm.replaceChildren(
+      cell("tp","True churn caught",tp), cell("fp","False alarm",fp),
+      cell("fn","Missed churner",fn), cell("tn","Correctly safe",tn)
+    );
+    const mr=$("#thr-metrics"); mr.replaceChildren(
+      metric("precision",fmtPct(prec,1)), metric("recall",fmtPct(rec,1)),
+      metric("F1",fmt(f1,3)), metric("accuracy",fmtPct(acc,1)),
+      metric("flagged",fmtInt(tp+fp))
+    );
+  }
+  function cell(cls,t,n){ return el("div",{class:"cell "+cls}, el("div",{class:"n"},fmtInt(n)), el("div",{class:"t"},t)); }
+  function metric(k,v){ return el("div",{class:"metric"}, el("div",{class:"v"},v), el("div",{class:"k"},k)); }
+  slider.addEventListener("input", e=>render(+e.target.value));
+  render(0.5);
+})();
+
+/* ============================ 05 Customers ============================ */
+(function customers(){
+  const cols=["customer_id","risk","churn",...DATA.feature_names];
+  const labels={customer_id:"id", risk:"risk", churn:"actual"};
+  let sortKey="risk", sortDir=-1, limit=150;
+  const head=$("#cust-head");
+  cols.forEach(c=>{
+    const th=el("th",{class:"sortable"+(c===sortKey?" active":"")}, labels[c]||c);
+    th.addEventListener("click",()=>{ if(sortKey===c) sortDir*=-1; else {sortKey=c; sortDir=(c==="customer_id")?1:-1;} limit=150; render(); });
+    th.dataset.k=c; if(c!=="customer_id"&&c!=="churn") th.classList.add("num");
+    head.append(th);
+  });
+  const search=$("#cust-search"), filter=$("#cust-filter");
+  search.addEventListener("input",()=>{limit=150;render();});
+  filter.addEventListener("change",()=>{limit=150;render();});
+
+  function rows(){
+    const q=search.value.trim(), f=filter.value;
+    let r=DATA.customers;
+    if(q) r=r.filter(c=> String(Math.round(c.customer_id)).includes(q));
+    if(f==="churn1") r=r.filter(c=>c.churn===1);
+    else if(f==="churn0") r=r.filter(c=>c.churn===0);
+    else if(f==="high") r=r.filter(c=>c.risk>=0.5);
+    r=[...r].sort((a,b)=>(a[sortKey]-b[sortKey])*sortDir);
+    return r;
+  }
+  function render(){
+    $$("#cust-head th").forEach(th=>th.classList.toggle("active", th.dataset.k===sortKey));
+    const r=rows(); const body=$("#cust-body"); body.replaceChildren();
+    r.slice(0,limit).forEach(c=>{
+      const tr=el("tr",{});
+      cols.forEach(col=>{
+        if(col==="customer_id") tr.append(el("td",{}, fmtInt(c.customer_id)));
+        else if(col==="risk"){
+          const td=el("td",{class:"num"});
+          td.append(el("span",{class:"risk-track"}, el("span",{class:"risk-fill", style:`width:${(c.risk*100).toFixed(0)}%; background:${riskColor(c.risk)}`})));
+          td.append(el("span",{style:"margin-left:8px;color:"+riskColor(c.risk)}, fmt(c.risk,2)));
+          tr.append(td);
+        }
+        else if(col==="churn") tr.append(el("td",{style:"color:"+(c.churn?C.churn:C.retain)}, c.churn?"churned":"retained"));
+        else tr.append(el("td",{class:"num"}, Math.abs(c[col])>=1000?fmtInt(c[col]):fmt(c[col],1)));
+      });
+      body.append(tr);
+    });
+    $("#cust-count").textContent = fmtInt(r.length)+" customers";
+    const more=$("#cust-more");
+    if(r.length>limit){ more.replaceChildren(el("a",{href:"#",onclick:e=>{e.preventDefault();limit+=200;render();}}, `▾ show more (${fmtInt(r.length-limit)} hidden)`)); }
+    else more.replaceChildren();
+  }
+  $("#cust-summary").textContent = `Open the explorer — all ${fmtInt(DATA.customers.length)} customers, scored & sortable`;
+  render();
+})();
+
+/* ============================ 06 What-if ============================ */
+(function whatif(){
+  const W=DATA.models.logit.whatif, E=DATA.eda.features;
+  const order=W.order;
+  const state={}, sliders={};
+  order.forEach(f=> state[f]=E[f].median);
+  const ctrl=$("#whatif-controls");
+  order.forEach(f=>{
+    const m=E[f]; const step=(m.max-m.min)/200 || 0.01;
+    const row=el("div",{style:"margin-bottom:14px"});
+    const top=el("div",{style:"display:flex;justify-content:space-between;align-items:baseline"},
+      el("span",{class:"mono",style:"font-size:13px"}, f),
+      el("span",{class:"mono",style:"font-size:13px;color:var(--churn)",id:"wv-"+f}, fmtVal(state[f])));
+    const sl=el("input",{type:"range",min:m.min,max:m.max,step:step,value:state[f],style:"width:100%"});
+    sl.addEventListener("input",e=>{ state[f]=+e.target.value; $("#wv-"+f).textContent=fmtVal(state[f]); compute(); });
+    row.append(top,sl); ctrl.append(row);
+    sliders[f]=sl;
+  });
+  function fmtVal(v){ return Math.abs(v)>=1000?fmtInt(v):fmt(v,2); }
+  function compute(){
+    let z=W.intercept; const contrib=[];
+    order.forEach((f,i)=>{
+      let x=state[f];
+      if(W.log_cols.includes(f)) x=Math.log1p(x);
+      const zc=W.coef[i]*((x-W.mean[i])/W.scale[i]);
+      z+=zc; contrib.push({f, zc});
+    });
+    const p=sigmoid(z);
+    $("#wi-prob").textContent=fmtPct(p,1);
+    $("#wi-prob").style.color=riskColor(p);
+    $("#wi-fill").style.width=(p*100).toFixed(0)+"%";
+    $("#wi-fill").style.background=riskColor(p);
+    $("#wi-verdict").textContent= p>=0.5? "→ likely to churn" : "→ likely to stay";
+    contrib.sort((a,b)=>Math.abs(b.zc)-Math.abs(a.zc));
+    const box=$("#wi-contrib"); box.replaceChildren();
+    const maxA=Math.max(...contrib.map(c=>Math.abs(c.zc)),0.001);
+    contrib.slice(0,5).forEach(c=>{
+      const w=Math.abs(c.zc)/maxA*100, pos=c.zc>=0;
+      box.append(el("div",{style:"display:flex;align-items:center;gap:8px;margin-bottom:5px"},
+        el("span",{class:"mono",style:"font-size:11px;width:120px;text-align:right;color:var(--ink-soft)"}, c.f),
+        el("span",{style:`height:9px;border-radius:3px;width:${w*0.5}%;background:${pos?C.churn:C.retain}`}),
+        el("span",{class:"mono",style:"font-size:10px;color:var(--muted)"}, (pos?"+":"")+c.zc.toFixed(2))
+      ));
+    });
+  }
+  $("#wi-reset").addEventListener("click",()=>{
+    order.forEach(f=>{ state[f]=E[f].median; sliders[f].value=E[f].median; $("#wv-"+f).textContent=fmtVal(state[f]); });
+    compute();
+  });
+  compute();
+})();
+</script>
+</body>
+</html>
